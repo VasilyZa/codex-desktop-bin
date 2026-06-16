@@ -1,0 +1,62 @@
+name: Build Codex Desktop
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: "codex-desktop-linux branch, tag, or commit"
+        required: true
+        default: "main"
+      max_build_threads:
+        description: "Build/compression threads"
+        required: true
+        default: "4"
+      package_with_updater:
+        description: "Include codex-update-manager"
+        required: true
+        type: boolean
+        default: true
+      upload_artifact:
+        description: "Upload binary artifact. May redistribute Codex Desktop payload; keep false unless permitted."
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Install CI tools
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --needed --noconfirm git nodejs npm python 7zip curl unzip zstd base-devel rust
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build package
+        run: |
+          MAX_BUILD_THREADS="${{ inputs.max_build_threads }}" \
+          UPSTREAM_REF="${{ inputs.upstream_ref }}" \
+          PACKAGE_WITH_UPDATER="${{ inputs.package_with_updater && '1' || '0' }}" \
+          ./scripts/build-latest.sh
+
+      - name: Show package metadata
+        run: |
+          pacman -Qip dist/codex-desktop-bin-latest.pkg.tar.zst
+          sha256sum dist/*.pkg.tar.zst
+
+      - name: Upload package artifact
+        if: ${{ inputs.upload_artifact }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-desktop-bin-x86_64
+          path: |
+            dist/*.pkg.tar.zst
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 7
