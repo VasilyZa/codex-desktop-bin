@@ -74,7 +74,10 @@ fi
 dest="$OUTPUT_DIR/$(basename "$latest_pkg")"
 cp "$latest_pkg" "$dest"
 ln -sfn "$(basename "$dest")" "$OUTPUT_DIR/$PACKAGE_NAME-latest.pkg.tar.zst"
+cp "$dest" "$OUTPUT_DIR/$PACKAGE_NAME-x86_64.pkg.tar.zst"
 sha256sum "$dest" | tee "$dest.sha256"
+sha256sum "$OUTPUT_DIR/$PACKAGE_NAME-x86_64.pkg.tar.zst" | tee "$OUTPUT_DIR/$PACKAGE_NAME-x86_64.pkg.tar.zst.sha256"
 
 printf '\nBuilt package:\n  %s\n' "$dest"
 printf 'Latest symlink:\n  %s\n' "$OUTPUT_DIR/$PACKAGE_NAME-latest.pkg.tar.zst"
+printf 'Stable prebuilt asset:\n  %s\n' "$OUTPUT_DIR/$PACKAGE_NAME-x86_64.pkg.tar.zst"

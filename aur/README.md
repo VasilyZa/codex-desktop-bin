@@ -1,35 +1,51 @@
-# AUR Draft
+# AUR package: codex-desktop-bin
 
-Package name target:
+This directory contains the AUR package files.
 
-```text
-codex-desktop-bin
-```
-
-The included `PKGBUILD.template` assumes a GitHub Release artifact exists:
-
-```text
-codex-desktop-bin-$pkgver-$pkgrel-x86_64.pkg.tar.zst
-```
-
-Before submitting to AUR:
-
-1. Confirm binary redistribution is permitted.
-2. Create a GitHub Release with the package artifact.
-3. Replace `REPLACE_WITH_SHA256` with the release artifact SHA256.
-4. Generate `.SRCINFO`:
+Default install:
 
 ```bash
-cp PKGBUILD.template PKGBUILD
+yay -S codex-desktop-bin
+```
+
+or:
+
+```bash
+paru -S codex-desktop-bin
+```
+
+Default behavior is local-build. It downloads the official Codex DMG and builds
+the Linux package on the user's machine.
+
+When yay/paru asks whether to clean build, choose clean build to force a fresh
+Codex DMG download. Otherwise the helper may reuse its cached sources.
+
+Fast trusted prebuilt mode:
+
+```bash
+PREBUILT=1 yay -S codex-desktop-bin
+```
+
+Optional overrides:
+
+```bash
+PREBUILT=1 PREBUILT_URL=https://example.com/codex-desktop-bin-x86_64.pkg.tar.zst yay -S codex-desktop-bin
+PREBUILT=1 PREBUILT_SHA256=<sha256> yay -S codex-desktop-bin
+```
+
+Update `.SRCINFO` after changing `PKGBUILD`:
+
+```bash
 makepkg --printsrcinfo > .SRCINFO
 ```
 
-5. Review the package with `namcap` if available.
-6. Push to the AUR git repository:
+Publish to AUR:
 
 ```bash
 git clone ssh://aur@aur.archlinux.org/codex-desktop-bin.git
+cp PKGBUILD .SRCINFO codex-desktop-bin/
+cd codex-desktop-bin
+git add PKGBUILD .SRCINFO
+git commit -m "Initial import"
+git push
 ```
-
-If redistribution is not allowed, use this repository as a local build tool
-instead of publishing a `-bin` package.

@@ -1,0 +1,116 @@
+# Maintainer: JuckZ <juckz@foxmail.com>
+
+pkgname=codex-desktop-bin
+pkgver=0.8.2.r0
+pkgrel=1
+pkgdesc="Codex Desktop for Linux, built locally by default with optional trusted prebuilt mode"
+arch=('x86_64')
+url="https://github.com/JuckZ/codex-desktop-bin"
+license=('MIT' 'custom')
+install="${pkgname}.install"
+depends=(
+  'python'
+  'p7zip'
+  'polkit'
+  'curl'
+  'unzip'
+  'gcc'
+  'make'
+  'alsa-lib'
+  'at-spi2-core'
+  'atk'
+  'cairo'
+  'dbus'
+  'glib2'
+  'gtk3'
+  'libcups'
+  'libdrm'
+  'libx11'
+  'libxcb'
+  'libxcomposite'
+  'libxdamage'
+  'libxext'
+  'libxfixes'
+  'libxkbcommon'
+  'libxrandr'
+  'mesa'
+  'nspr'
+  'nss'
+  'pango'
+)
+makedepends=(
+  '7zip'
+  'git'
+  'nodejs'
+  'npm'
+  'rust'
+  'zstd'
+)
+optdepends=(
+  'nodejs>=22.22.0: optional override for the bundled managed Node.js runtime'
+  'npm: optional override for Codex CLI install/update flows'
+  'zenity: GTK dialog fallback when the Codex CLI is missing'
+  'kdialog: KDE dialog fallback when the Codex CLI is missing'
+)
+provides=('codex-desktop')
+conflicts=('codex-desktop' 'openai-codex-desktop')
+options=(!debug !strip)
+
+_prebuilt="${PREBUILT:-0}"
+_upstream_ref="${UPSTREAM_REF:-main}"
+_prebuilt_url="${PREBUILT_URL:-https://github.com/JuckZ/codex-desktop-bin/releases/latest/download/codex-desktop-bin-x86_64.pkg.tar.zst}"
+_prebuilt_sha256="${PREBUILT_SHA256:-SKIP}"
+
+if [[ "${_prebuilt}" == "1" ]]; then
+  source=("codex-desktop-bin-x86_64.pkg.tar.zst::${_prebuilt_url}")
+  sha256sums=("${_prebuilt_sha256}")
+else
+  source=(
+    "codex-desktop-linux::git+https://github.com/ilysenko/codex-desktop-linux.git#branch=${_upstream_ref}"
+    "Codex.dmg::https://persistent.oaistatic.com/codex-app-prod/Codex.dmg"
+  )
+  sha256sums=('SKIP' 'SKIP')
+fi
+
+pkgver() {
+  if [[ "${_prebuilt}" == "1" ]]; then
+    printf '%s\n' "${pkgver}"
+    return
+  fi
+
+  cd "${srcdir}/codex-desktop-linux"
+  printf '0.8.2.r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  if [[ "${_prebuilt}" == "1" ]]; then
+    return
+  fi
+
+  cd "${srcdir}/codex-desktop-linux"
+  MAX_BUILD_THREADS="${MAX_BUILD_THREADS:-$(nproc)}" make build-app DMG="${srcdir}/Codex.dmg"
+  MAX_BUILD_THREADS="${MAX_BUILD_THREADS:-$(nproc)}" \
+    PACKAGE_NAME="${pkgname}" \
+    PACKAGE_DISPLAY_NAME="Codex Desktop" \
+    PACKAGE_COMMENT="Run Codex Desktop on Linux" \
+    PACKAGE_WITH_UPDATER="${PACKAGE_WITH_UPDATER:-1}" \
+    make pacman
+}
+
+package() {
+  local package_file
+
+  if [[ "${_prebuilt}" == "1" ]]; then
+    package_file="${srcdir}/codex-desktop-bin-x86_64.pkg.tar.zst"
+  else
+    package_file="$(find "${srcdir}/codex-desktop-linux/dist" -maxdepth 1 -type f -name "${pkgname}-[0-9]*.pkg.tar.*" | sort -V | tail -n 1)"
+  fi
+
+  if [[ -z "${package_file}" || ! -f "${package_file}" ]]; then
+    printf 'Could not find generated package file\n' >&2
+    return 1
+  fi
+
+  bsdtar -xf "${package_file}" -C "${pkgdir}"
+  rm -f "${pkgdir}/.BUILDINFO" "${pkgdir}/.INSTALL" "${pkgdir}/.MTREE" "${pkgdir}/.PKGINFO"
+}

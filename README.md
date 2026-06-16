@@ -1,56 +1,116 @@
 # codex-desktop-bin
 
-Build the latest Codex Desktop Linux package for Arch/CachyOS from the upstream
-community port at <https://github.com/ilysenko/codex-desktop-linux>.
+Arch/CachyOS packaging for the latest Codex Desktop Linux build, powered by the
+community conversion project <https://github.com/ilysenko/codex-desktop-linux>.
 
-This repository intentionally contains only automation, packaging templates, and
-documentation. It does not commit or publish OpenAI Codex Desktop binaries by
-default.
+The package name is `codex-desktop-bin`, but the default install path is
+local-build first: every user downloads the official upstream `Codex.dmg` and
+builds the Linux package on their own machine. This avoids publicly
+redistributing the converted Codex Desktop app payload.
 
-## What It Builds
+For personal machines or trusted common environments, an explicit prebuilt mode
+is available with `PREBUILT=1`.
 
-Default package identity:
+## Beginner Install
 
-- Package name: `codex-desktop-bin`
-- Install root: `/opt/codex-desktop-bin`
-- Launcher: `/usr/bin/codex-desktop-bin`
-- Desktop file: `/usr/share/applications/codex-desktop-bin.desktop`
-
-The generated package is built by:
-
-1. Cloning/updating `ilysenko/codex-desktop-linux`.
-2. Downloading the latest upstream `Codex.dmg`.
-3. Converting the macOS Electron app into a Linux Electron app.
-4. Packaging the result as an Arch `.pkg.tar.zst`.
-
-## Local Build
-
-Install the normal Arch/CachyOS build dependencies first:
+If the package has been published to AUR:
 
 ```bash
-sudo pacman -S --needed nodejs npm python 7zip curl unzip zstd base-devel rust
+yay -S codex-desktop-bin
 ```
 
-Build the latest package:
+or:
+
+```bash
+paru -S codex-desktop-bin
+```
+
+That default path builds locally. It may take several minutes and download a
+large DMG plus Electron/runtime dependencies.
+
+When yay/paru asks whether to clean build, choose clean build if you want to
+force a fresh Codex DMG download. Otherwise the helper may reuse a cached DMG.
+
+If you already have another Codex Desktop package installed, remove it first:
+
+```bash
+sudo pacman -R openai-codex-desktop
+```
+
+Keep your Codex CLI/config data. Do not delete `~/.codex` unless you explicitly
+want to remove local Codex state.
+
+## Fast Prebuilt Install
+
+Prebuilt mode is opt-in:
+
+```bash
+PREBUILT=1 yay -S codex-desktop-bin
+```
+
+or:
+
+```bash
+PREBUILT=1 paru -S codex-desktop-bin
+```
+
+By default this pulls:
+
+```text
+https://github.com/JuckZ/codex-desktop-bin/releases/latest/download/codex-desktop-bin-x86_64.pkg.tar.zst
+```
+
+You can override it:
+
+```bash
+PREBUILT=1 PREBUILT_URL=https://example.com/codex-desktop-bin-x86_64.pkg.tar.zst yay -S codex-desktop-bin
+```
+
+For stricter verification:
+
+```bash
+PREBUILT=1 PREBUILT_SHA256=<sha256> yay -S codex-desktop-bin
+```
+
+Only use prebuilt mode for artifacts you trust.
+
+## Updating Later
+
+For normal users:
+
+```bash
+yay -S codex-desktop-bin
+```
+
+When prompted, choose a clean build to force a fresh local conversion.
+
+For fast trusted installs:
+
+```bash
+PREBUILT=1 yay -S codex-desktop-bin
+```
+
+The installed package includes the upstream update manager by default unless it
+is built with `PACKAGE_WITH_UPDATER=0`.
+
+## Manual Local Build
+
+Install build dependencies:
+
+```bash
+sudo pacman -S --needed git nodejs npm python 7zip curl unzip zstd rust base-devel
+```
+
+Build:
 
 ```bash
 ./scripts/build-latest.sh
 ```
 
-The package is written to `dist/`, with a `codex-desktop-bin-latest.pkg.tar.zst`
-symlink and a SHA256 file.
-
-Install it manually:
+Install the generated package:
 
 ```bash
 sudo pacman -U dist/codex-desktop-bin-latest.pkg.tar.zst
-```
-
-If another Codex Desktop package already owns the `codex://` desktop handler,
-remove that package first. On my CachyOS machine the old package was:
-
-```bash
-sudo pacman -R openai-codex-desktop
 ```
 
 ## Build Options
@@ -73,21 +133,33 @@ Supported environment variables:
 - `PACKAGE_WITH_UPDATER`: include upstream update manager. Defaults to `1`.
 - `MAX_BUILD_THREADS`: build/compression threads. Defaults to `nproc`.
 
+## AUR Files
+
+`aur/PKGBUILD` is the AUR-ready default:
+
+- `PREBUILT=0` or unset: local build from upstream DMG.
+- `PREBUILT=1`: install a trusted prebuilt package artifact.
+
+Refresh `.SRCINFO` after editing the PKGBUILD:
+
+```bash
+cd aur
+makepkg --printsrcinfo > .SRCINFO
+```
+
+Submit/push `aur/PKGBUILD` and `aur/.SRCINFO` to:
+
+```text
+ssh://aur@aur.archlinux.org/codex-desktop-bin.git
+```
+
 ## GitHub Actions
 
-The manual workflow `.github/workflows/build.yml` can build the package on an
+The manual workflow `.github/workflows/build.yml` can build the package in an
 Arch Linux container. Artifact upload is disabled by default.
 
-Do not publish public binary artifacts unless you have confirmed that
-redistributing the converted Codex Desktop payload is allowed.
+Publishing prebuilt artifacts is convenient, but it redistributes the converted
+Codex Desktop payload. Keep local-build as the public default unless you have
+cleared that distribution question.
 
-## AUR
-
-`aur/` contains a draft `codex-desktop-bin` AUR template. It assumes a GitHub
-Release artifact exists and installs that binary payload.
-
-The safer public AUR route is to publish a source/build package that makes each
-user build from the upstream DMG locally. A true `-bin` AUR package should only
-be submitted after the binary redistribution question is resolved.
-
-See [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) and [aur/README.md](aur/README.md).
+See [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
