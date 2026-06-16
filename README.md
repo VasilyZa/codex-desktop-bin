@@ -3,6 +3,10 @@
 Arch/CachyOS packaging for the latest Codex Desktop Linux build, powered by the
 community conversion project <https://github.com/ilysenko/codex-desktop-linux>.
 
+Special thanks to
+[ilysenko/codex-desktop-linux](https://github.com/ilysenko/codex-desktop-linux)
+for the core Linux conversion idea and implementation approach.
+
 The package name is `codex-desktop-bin`, but the default install path is
 local-build first: every user downloads the official upstream `Codex.dmg` and
 builds the Linux package on their own machine. This avoids publicly
@@ -163,3 +167,18 @@ Codex Desktop payload. Keep local-build as the public default unless you have
 cleared that distribution question.
 
 See [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
+
+## Disclaimer
+
+This is an unofficial community project and is not affiliated with, endorsed by,
+or supported by OpenAI. OpenAI, Codex, and related names/assets belong to their
+respective rights holders.
+
+Local build is the public default because public prebuilt artifacts may
+redistribute converted Codex Desktop payload from the upstream macOS DMG.
+Prebuilt mode is opt-in and should only be used for artifacts you trust.
+
+Rights holders can request review or removal through a GitHub issue or the
+maintainer email listed in the AUR package.
+
+See [DISCLAIMER.md](DISCLAIMER.md) for the full disclaimer.

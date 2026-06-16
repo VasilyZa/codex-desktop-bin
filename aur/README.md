@@ -2,6 +2,10 @@
 
 This directory contains the AUR package files.
 
+This package is based on the Linux conversion workflow from
+[ilysenko/codex-desktop-linux](https://github.com/ilysenko/codex-desktop-linux).
+This project is unofficial and is not affiliated with OpenAI.
+
 Default install:
 
 ```bash
@@ -49,3 +53,6 @@ git add PKGBUILD .SRCINFO
 git commit -m "Initial import"
 git push
 ```
+
+Before publishing, review the root `DISCLAIMER.md`. If a rights holder requests
+removal, disable prebuilt artifacts and/or remove the AUR package as appropriate.
