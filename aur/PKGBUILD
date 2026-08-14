@@ -1,30 +1,32 @@
 # Maintainer: JuckZ <juckz@foxmail.com>
 
-pkgname=codex-desktop-bin
-pkgver=0.8.2.r0
+pkgname=codex-desktop
+pkgver=2026.08.13.121144
 pkgrel=1
-pkgdesc="Codex Desktop for Linux, built locally by default with optional trusted prebuilt mode"
-arch=('x86_64')
+pkgdesc="ChatGPT Community for Arch, repackaged from OpenAI's signed official Linux package"
+arch=('x86_64' 'aarch64')
 url="https://github.com/JuckZ/codex-desktop-bin"
 license=('MIT' 'custom')
-install="${pkgname}.install"
+install='codex-desktop.install'
 depends=(
-  'python'
-  'p7zip'
-  'polkit'
-  'curl'
-  'unzip'
-  'gcc'
-  'make'
   'alsa-lib'
   'at-spi2-core'
   'atk'
   'cairo'
+  'curl'
   'dbus'
+  'dpkg'
+  'expat'
+  'gdk-pixbuf2'
   'glib2'
+  'gnupg'
+  'graphite'
   'gtk3'
   'libcups'
   'libdrm'
+  'libglvnd'
+  'libnotify'
+  'libusb'
   'libx11'
   'libxcb'
   'libxcomposite'
@@ -34,83 +36,90 @@ depends=(
   'libxkbcommon'
   'libxrandr'
   'mesa'
+  'nodejs'
   'nspr'
   'nss'
+  'openssl'
   'pango'
+  'polkit'
+  'systemd-libs'
+  'xdg-utils'
+  'xz'
 )
 makedepends=(
-  '7zip'
   'git'
-  'nodejs'
+  'make'
   'npm'
+  'python'
   'rust'
-  'zstd'
 )
 optdepends=(
-  'nodejs>=22.22.0: optional override for the bundled managed Node.js runtime'
-  'npm: optional override for Codex CLI install/update flows'
-  'zenity: GTK dialog fallback when the Codex CLI is missing'
-  'kdialog: KDE dialog fallback when the Codex CLI is missing'
+  'git: project source control integration'
+  'pulseaudio: audio integration'
 )
 provides=('codex-desktop')
-conflicts=('codex-desktop' 'openai-codex-desktop')
+conflicts=('codex-desktop-bin' 'openai-codex-desktop')
+replaces=('codex-desktop-bin')
 options=(!debug !strip)
 
-_prebuilt="${PREBUILT:-0}"
-_upstream_ref="${UPSTREAM_REF:-main}"
-_prebuilt_url="${PREBUILT_URL:-https://github.com/JuckZ/codex-desktop-bin/releases/latest/download/codex-desktop-bin-x86_64.pkg.tar.zst}"
-_prebuilt_sha256="${PREBUILT_SHA256:-SKIP}"
+_upstream_ref='bf7c98089a2c35951a7c4dffa736e27219559753'
+_chatgpt_ver='26.803.81509'
+source=(
+  "codex-desktop-linux::git+https://github.com/ilysenko/codex-desktop-linux.git#commit=${_upstream_ref}"
+  'arch-legacy-package.patch'
+  'LICENSE'
+  'DISCLAIMER.md'
+)
+sha256sums=(
+  'SKIP'
+  '55aff1cc44a6ccbdc4d310ea88383c63cdf4170adbea6a7fea4a8c489286e804'
+  '240808ad5dc4e6267fb92e6a77e34d87614b0a934415b70562657534a956d161'
+  '75e2921aec7edfbe78906419394dfbaf93fba0373cc6cd92a2d9a49109f383d3'
+)
+source_x86_64=("chatgpt_amd64.deb::https://persistent.oaistatic.com/codex-app-prod/linux/deb/pool/main/c/chatgpt/chatgpt_${_chatgpt_ver}_amd64.deb")
+sha256sums_x86_64=('a9bf91a368f9f7c4eea38082a9fb8fb46b8d005b719a6d7715d2e5a1982c38eb')
+source_aarch64=("chatgpt_arm64.deb::https://persistent.oaistatic.com/codex-app-prod/linux/deb/pool/main/c/chatgpt/chatgpt_${_chatgpt_ver}_arm64.deb")
+sha256sums_aarch64=('f38fcc194eca9ab0327dc10c92340681eae77c5d75164df700384ce2adaccbc1')
 
-if [[ "${_prebuilt}" == "1" ]]; then
-  source=("codex-desktop-bin-x86_64.pkg.tar.zst::${_prebuilt_url}")
-  sha256sums=("${_prebuilt_sha256}")
-else
-  source=(
-    "codex-desktop-linux::git+https://github.com/ilysenko/codex-desktop-linux.git#branch=${_upstream_ref}"
-    "Codex.dmg::https://persistent.oaistatic.com/codex-app-prod/Codex.dmg"
-  )
-  sha256sums=('SKIP' 'SKIP')
-fi
-
-pkgver() {
-  if [[ "${_prebuilt}" == "1" ]]; then
-    printf '%s\n' "${pkgver}"
-    return
-  fi
-
-  cd "${srcdir}/codex-desktop-linux"
-  printf '0.8.2.r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+prepare() {
+  cd "$srcdir/codex-desktop-linux"
+  git apply "$srcdir/arch-legacy-package.patch"
 }
 
 build() {
-  if [[ "${_prebuilt}" == "1" ]]; then
-    return
-  fi
+  local upstream_deb
+  case "$CARCH" in
+    x86_64) upstream_deb="$srcdir/chatgpt_amd64.deb" ;;
+    aarch64) upstream_deb="$srcdir/chatgpt_arm64.deb" ;;
+    *) return 1 ;;
+  esac
 
-  cd "${srcdir}/codex-desktop-linux"
-  MAX_BUILD_THREADS="${MAX_BUILD_THREADS:-$(nproc)}" make build-app DMG="${srcdir}/Codex.dmg"
-  MAX_BUILD_THREADS="${MAX_BUILD_THREADS:-$(nproc)}" \
-    PACKAGE_NAME="${pkgname}" \
-    PACKAGE_DISPLAY_NAME="Codex Desktop" \
-    PACKAGE_COMMENT="Run Codex Desktop on Linux" \
-    PACKAGE_WITH_UPDATER="${PACKAGE_WITH_UPDATER:-1}" \
-    make pacman
+  cd "$srcdir/codex-desktop-linux"
+  CODEX_APP_ID=codex-desktop \
+    CODEX_APP_DISPLAY_NAME='ChatGPT Community' \
+    CODEX_INSTALL_DIR="$srcdir/codex-desktop-linux/codex-app" \
+    UPSTREAM_DEB= \
+    ./install.sh "$upstream_deb"
+
+  MAX_BUILD_THREADS="$(nproc)" \
+    CARGO_TARGET_DIR="$srcdir/cargo-target" \
+    PACKAGE_NAME=codex-desktop \
+    PACKAGE_VERSION="$pkgver" \
+    PACKAGE_DISPLAY_NAME='ChatGPT Community' \
+    PACKAGE_COMMENT='Community Linux distribution based on OpenAI ChatGPT' \
+    PACKAGE_WITH_UPDATER=1 \
+    UPDATER_BINARY_SOURCE="$srcdir/cargo-target/release/codex-update-manager" \
+    make -e pacman
 }
 
 package() {
   local package_file
+  package_file="$(find "$srcdir/codex-desktop-linux/dist" -maxdepth 1 -type f \
+    -name 'codex-desktop-*.pkg.tar.*' -print | sort -V | tail -n 1)"
+  [ -n "$package_file" ] || return 1
 
-  if [[ "${_prebuilt}" == "1" ]]; then
-    package_file="${srcdir}/codex-desktop-bin-x86_64.pkg.tar.zst"
-  else
-    package_file="$(find "${srcdir}/codex-desktop-linux/dist" -maxdepth 1 -type f -name "${pkgname}-[0-9]*.pkg.tar.*" | sort -V | tail -n 1)"
-  fi
-
-  if [[ -z "${package_file}" || ! -f "${package_file}" ]]; then
-    printf 'Could not find generated package file\n' >&2
-    return 1
-  fi
-
-  bsdtar -xf "${package_file}" -C "${pkgdir}"
-  rm -f "${pkgdir}/.BUILDINFO" "${pkgdir}/.INSTALL" "${pkgdir}/.MTREE" "${pkgdir}/.PKGINFO"
+  bsdtar -xf "$package_file" -C "$pkgdir"
+  rm -f "$pkgdir/.BUILDINFO" "$pkgdir/.INSTALL" "$pkgdir/.MTREE" "$pkgdir/.PKGINFO"
+  install -Dm644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE.packaging"
+  install -Dm644 "$srcdir/DISCLAIMER.md" "$pkgdir/usr/share/licenses/$pkgname/DISCLAIMER.md"
 }

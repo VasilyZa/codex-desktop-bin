@@ -1,184 +1,123 @@
 # codex-desktop-bin
 
-Arch/CachyOS packaging for the latest Codex Desktop Linux build, powered by the
-community conversion project <https://github.com/ilysenko/codex-desktop-linux>.
+Arch/CachyOS packaging for **ChatGPT Community**, built from OpenAI's signed
+official Linux ChatGPT package through
+[`ilysenko/codex-desktop-linux`](https://github.com/ilysenko/codex-desktop-linux).
 
-Special thanks to
-[ilysenko/codex-desktop-linux](https://github.com/ilysenko/codex-desktop-linux)
-for the core Linux conversion idea and implementation approach.
+Despite this repository's historical name, generated packages now use the
+upstream-compatible package and command identity `codex-desktop`. This is
+required by the bundled transactional updater. The package replaces the legacy
+`codex-desktop-bin` package in one pacman transaction and preserves user data.
 
-The package name is `codex-desktop-bin`, but the default install path is
-local-build first: every user downloads the official upstream `Codex.dmg` and
-builds the Linux package on their own machine. This avoids publicly
-redistributing the converted Codex Desktop app payload.
+## What changed
 
-For personal machines or trusted common environments, an explicit prebuilt mode
-is available with `PREBUILT=1`.
+OpenAI now publishes a native Linux package. This project no longer downloads
+or converts `Codex.dmg`. The current build:
 
-## Beginner Install
+- verifies OpenAI's signed stable APT metadata and package SHA-256;
+- extracts the official Linux Electron runtime and bundled tools;
+- preserves `resources/app.asar` byte-for-byte when no optional feature is
+  enabled;
+- produces a native Arch package;
+- includes the upstream transactional update manager and rollback support.
 
-If the package has been published to AUR:
+The installed desktop entry is **ChatGPT Community** so it remains distinct
+from OpenAI's separate `chatgpt` package.
 
-```bash
-yay -S codex-desktop-bin
-```
+OpenAI currently documents the Linux app as a preview for supported Ubuntu,
+Debian, and Fedora releases. Arch/CachyOS is not listed as a supported target,
+so this repository remains the compatibility and pacman-packaging layer for
+those systems. See the [official Linux app documentation](https://developers.openai.com/codex/linux/linux-app/).
 
-or:
-
-```bash
-paru -S codex-desktop-bin
-```
-
-That default path builds locally. It may take several minutes and download a
-large DMG plus Electron/runtime dependencies.
-
-When yay/paru asks whether to clean build, choose clean build if you want to
-force a fresh Codex DMG download. Otherwise the helper may reuse a cached DMG.
-
-If you already have another Codex Desktop package installed, remove it first:
-
-```bash
-sudo pacman -R openai-codex-desktop
-```
-
-Keep your Codex CLI/config data. Do not delete `~/.codex` unless you explicitly
-want to remove local Codex state.
-
-## Fast Prebuilt Install
-
-Prebuilt mode is opt-in:
-
-```bash
-PREBUILT=1 yay -S codex-desktop-bin
-```
-
-or:
-
-```bash
-PREBUILT=1 paru -S codex-desktop-bin
-```
-
-By default this pulls:
-
-```text
-https://github.com/JuckZ/codex-desktop-bin/releases/latest/download/codex-desktop-bin-x86_64.pkg.tar.zst
-```
-
-You can override it:
-
-```bash
-PREBUILT=1 PREBUILT_URL=https://example.com/codex-desktop-bin-x86_64.pkg.tar.zst yay -S codex-desktop-bin
-```
-
-For stricter verification:
-
-```bash
-PREBUILT=1 PREBUILT_SHA256=<sha256> yay -S codex-desktop-bin
-```
-
-Only use prebuilt mode for artifacts you trust.
-
-## Updating Later
-
-For normal users:
-
-```bash
-yay -S codex-desktop-bin
-```
-
-When prompted, choose a clean build to force a fresh local conversion.
-
-For fast trusted installs:
-
-```bash
-PREBUILT=1 yay -S codex-desktop-bin
-```
-
-The installed package includes the upstream update manager by default unless it
-is built with `PACKAGE_WITH_UPDATER=0`.
-
-## Manual Local Build
+## Build and install on Arch/CachyOS
 
 Install build dependencies:
 
 ```bash
-sudo pacman -S --needed git nodejs npm python 7zip curl unzip zstd rust base-devel
+sudo pacman -S --needed base-devel curl dpkg git gnupg nodejs npm python rust
 ```
 
-Build:
+Build from the latest upstream commit and OpenAI's signed stable package:
 
 ```bash
 ./scripts/build-latest.sh
 ```
 
-Install the generated package:
+Install it, including automatic replacement of a legacy `codex-desktop-bin`
+installation:
 
 ```bash
-sudo pacman -U dist/codex-desktop-bin-latest.pkg.tar.zst
+./scripts/install-local.sh
 ```
 
-## Build Options
+The migration does not delete `~/.codex`, which is shared application and CLI
+state. Fully quit Codex Desktop before installing.
+
+## Verify
 
 ```bash
-UPSTREAM_REF=main ./scripts/build-latest.sh
+pacman -Qi codex-desktop
+codex-desktop --diagnose
+systemctl --user status codex-update-manager.service --no-pager
+codex-update-manager status --json
+```
+
+## Updating
+
+The installed updater checks OpenAI's signed stable repository and rebuilds the
+native package with the same feature selection:
+
+```bash
+codex-update-manager check-now
+codex-update-manager status
+```
+
+To update explicitly through this repository instead:
+
+```bash
+git pull --ff-only
+./scripts/build-latest.sh
+./scripts/install-local.sh
+```
+
+Useful build overrides:
+
+```bash
+UPSTREAM_REF=<branch-tag-or-commit> ./scripts/build-latest.sh
 MAX_BUILD_THREADS=8 ./scripts/build-latest.sh
 PACKAGE_WITH_UPDATER=0 ./scripts/build-latest.sh
 OUTPUT_DIR=/tmp/codex-dist ./scripts/build-latest.sh
+UPSTREAM_DEB=/path/to/chatgpt_amd64.deb ./scripts/build-latest.sh
 ```
 
-Supported environment variables:
+## AUR files
 
-- `UPSTREAM_URL`: upstream wrapper repository URL.
-- `UPSTREAM_REF`: upstream branch, tag, or commit. Defaults to `main`.
-- `WORK_DIR`: local checkout cache. Defaults to `.work/codex-desktop-linux`.
-- `OUTPUT_DIR`: package output directory. Defaults to `dist`.
-- `PACKAGE_NAME`: package name. Defaults to `codex-desktop-bin`.
-- `PACKAGE_DISPLAY_NAME`: desktop display name. Defaults to `Codex Desktop`.
-- `PACKAGE_WITH_UPDATER`: include upstream update manager. Defaults to `1`.
-- `MAX_BUILD_THREADS`: build/compression threads. Defaults to `nproc`.
-
-## AUR Files
-
-`aur/PKGBUILD` is the AUR-ready default:
-
-- `PREBUILT=0` or unset: local build from upstream DMG.
-- `PREBUILT=1`: install a trusted prebuilt package artifact.
-
-Refresh `.SRCINFO` after editing the PKGBUILD:
+`aur/PKGBUILD` is a reproducible AUR-style recipe pinned to a reviewed upstream
+commit and a concrete official package version/hash. `pkgver` follows the UTC
+build timestamp scheme used by the updater; `_chatgpt_ver` records the OpenAI
+application version. When OpenAI publishes a new version, update both values,
+both architecture hashes, and refresh:
 
 ```bash
 cd aur
 makepkg --printsrcinfo > .SRCINFO
 ```
 
-Submit/push `aur/PKGBUILD` and `aur/.SRCINFO` to:
+The local `scripts/build-latest.sh` path intentionally follows the signed
+stable metadata instead of a static version pin.
+
+## Wayland
+
+OpenAI's native Wayland support is experimental. The default XWayland path is
+recommended first. To test native Wayland, add this line to
+`~/.config/codex-desktop/electron-flags.conf`:
 
 ```text
-ssh://aur@aur.archlinux.org/codex-desktop-bin.git
+--ozone-platform=wayland
 ```
-
-## GitHub Actions
-
-The manual workflow `.github/workflows/build.yml` can build the package in an
-Arch Linux container. Artifact upload is disabled by default.
-
-Publishing prebuilt artifacts is convenient, but it redistributes the converted
-Codex Desktop payload. Keep local-build as the public default unless you have
-cleared that distribution question.
-
-See [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
 
 ## Disclaimer
 
-This is an unofficial community project and is not affiliated with, endorsed by,
-or supported by OpenAI. OpenAI, Codex, and related names/assets belong to their
-respective rights holders.
-
-Local build is the public default because public prebuilt artifacts may
-redistribute converted Codex Desktop payload from the upstream macOS DMG.
-Prebuilt mode is opt-in and should only be used for artifacts you trust.
-
-Rights holders can request review or removal through a GitHub issue or the
-maintainer email listed in the AUR package.
-
-See [DISCLAIMER.md](DISCLAIMER.md) for the full disclaimer.
+This is an unofficial community packaging project. It is not affiliated with,
+endorsed by, or supported by OpenAI. OpenAI, ChatGPT, Codex, and related assets
+belong to their respective rights holders. See [DISCLAIMER.md](DISCLAIMER.md).

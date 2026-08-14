@@ -2,58 +2,33 @@
 
 ## Acknowledgements
 
-This project is built on the idea and engineering approach demonstrated by
-[ilysenko/codex-desktop-linux](https://github.com/ilysenko/codex-desktop-linux).
-That project showed how the official macOS Codex Desktop app can be converted
-into a Linux Electron app on the user's own machine. This repository focuses on
-Arch/CachyOS packaging, AUR-friendly installation, and optional trusted prebuilt
-distribution paths.
+This project uses the verification, Linux packaging, and update workflow from
+[`ilysenko/codex-desktop-linux`](https://github.com/ilysenko/codex-desktop-linux).
+It repackages OpenAI's signed official Linux ChatGPT desktop payload for
+Arch/CachyOS.
 
-Thank you to the `codex-desktop-linux` maintainers and contributors for making
-the Linux conversion workflow understandable and reusable.
+## Unofficial project
 
-## Unofficial Project
+This project is not created, endorsed, sponsored, reviewed, or supported by
+OpenAI. OpenAI, ChatGPT, Codex, related names, marks, logos, application assets,
+and product materials belong to OpenAI or their respective rights holders.
 
-This is an unofficial community project. It is not created, endorsed, sponsored,
-reviewed, or supported by OpenAI.
+## User responsibility
 
-OpenAI, Codex, and related names, marks, logos, application assets, and product
-materials belong to OpenAI or their respective rights holders. This repository
-does not claim ownership of those materials.
+Use this project at your own risk. Users are responsible for reviewing package
+scripts, complying with applicable terms and licenses, and protecting their
+credentials and configuration. The maintainers provide the packaging
+automation as-is, without warranty of fitness, security, compatibility,
+availability, or continued functionality.
 
-## User Responsibility
+## Binary distribution
 
-Use this project at your own risk. The default AUR/package flow builds locally
-from the official upstream `Codex.dmg` on the user's machine. Users are
-responsible for:
+Generated packages contain OpenAI application payload from the official Linux
+package. Redistribution rights for that payload are separate from this
+repository's MIT-licensed scripts and documentation. Do not assume the MIT
+license grants permission to redistribute generated binaries.
 
-- complying with OpenAI's terms and any applicable licenses;
-- reviewing the package scripts before running them;
-- deciding whether to trust optional prebuilt artifacts;
-- keeping their system, credentials, and Codex configuration safe.
+## Rights-holder contact
 
-The maintainers provide this packaging automation as-is, without warranty of
-fitness, security, compatibility, availability, or continued functionality.
-
-## Binary Distribution
-
-Public prebuilt artifacts may contain converted Codex Desktop application
-payload derived from the upstream macOS DMG. Redistribution rights for that
-payload are separate from this repository's own MIT-licensed scripts and
-documentation.
-
-For that reason, local build is the public default. Prebuilt mode is opt-in and
-intended for trusted environments.
-
-## Rights Holder Contact
-
-If you are OpenAI or another rights holder and believe this repository, package,
-release artifact, or AUR submission infringes your rights or violates applicable
-terms, please contact the maintainer. The disputed content will be reviewed and,
-where appropriate, removed or disabled.
-
-Preferred contact paths:
-
-- Open a GitHub issue in this repository.
-- Email the maintainer listed in the AUR `PKGBUILD`.
-
+Rights holders may request review or removal through a GitHub issue or the
+maintainer email listed in the package recipe.

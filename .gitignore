@@ -3,7 +3,6 @@ dist/
 *.pkg.tar.*
 *.pkg.tar.*.sig
 *.sha256
-Codex.dmg
 codex-app/
 codex-app-next/
 target/

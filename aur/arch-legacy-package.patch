@@ -1,0 +1,201 @@
+diff --git a/packaging/linux/PKGBUILD.template b/packaging/linux/PKGBUILD.template
+index 588dae8..255fce4 100644
+--- a/packaging/linux/PKGBUILD.template
++++ b/packaging/linux/PKGBUILD.template
+@@ -6,6 +6,9 @@ pkgdesc="Custom codex-desktop distribution built from OpenAI's official Linux pa
+ arch=('__ARCH__')
+ url="https://github.com/ilysenko/codex-desktop-linux"
+ license=('MIT')
++provides=('codex-desktop')
++conflicts=('codex-desktop-bin' 'openai-codex-desktop')
++replaces=('codex-desktop-bin')
+ depends=(
+     'polkit'
+     'curl'
+diff --git a/packaging/linux/codex-desktop-entry-doctor.sh b/packaging/linux/codex-desktop-entry-doctor.sh
+index 2277fcb..d778060 100644
+--- a/packaging/linux/codex-desktop-entry-doctor.sh
++++ b/packaging/linux/codex-desktop-entry-doctor.sh
+@@ -38,6 +38,13 @@ codex_desktop_entry_is_legacy_generated() {
+     grep -Eq '(^Exec=.*codex-desktop|^TryExec=.*codex-desktop|^Icon=codex-desktop$)' \
+         "$codex_desktop_file" || return 1
+ 
++    # Older Arch packages generated a complete user-local entry. It already
++    # has the current actions, but still shadows the system package entry.
++    if grep -q '^Comment=Run Codex Desktop on Linux$' "$codex_desktop_file" &&
++       grep -Eq '^Exec=env (CODEX_CLI_PATH=[^[:space:]]+ )?BAMF_DESKTOP_FILE_HINT=[^[:space:]]*/\.local/share/applications/codex-desktop\.desktop CHROME_DESKTOP=codex-desktop\.desktop /usr/bin/codex-desktop([[:space:]]|$)' "$codex_desktop_file"; then
++        return 0
++    fi
++
+     if grep -Eq 'codex-desktop-open-next|^Actions=NewWindow([;]|$)|^\[Desktop Action NewWindow\]$|^Actions=NewInstance([;]|$)|^\[Desktop Action NewInstance\]$' \
+         "$codex_desktop_file"; then
+         return 0
+diff --git a/updater/src/app.rs b/updater/src/app.rs
+index 323b69d..4ac9579 100644
+--- a/updater/src/app.rs
++++ b/updater/src/app.rs
+@@ -28,7 +28,7 @@ pub async fn run(cli: Cli) -> Result<()> {
+ 
+     match cli.command {
+         Commands::Daemon => daemon(&config, &mut state, &paths).await,
+-        Commands::CheckNow => check(&config, &mut state, &paths).await,
++        Commands::CheckNow => check(&config, &mut state, &paths, true).await,
+         Commands::Status { json } => status(&state, json),
+         Commands::Diagnose { json } => diagnose(&config, &state, &paths, json),
+         Commands::InstallReady => install_ready(&config, &mut state, &paths, true).await,
+@@ -56,7 +56,7 @@ fn run_privileged_command(command: &Commands) -> Option<Result<()>> {
+ 
+ async fn daemon(config: &RuntimeConfig, state: &mut PersistedState, paths: &RuntimePaths) -> Result<()> {
+     time::sleep(config.initial_check_delay_duration()).await;
+-    if let Err(error) = check(config, state, paths).await {
++    if let Err(error) = check(config, state, paths, false).await {
+         error!(?error, "initial update check failed");
+     }
+     let mut checks = time::interval(config.check_interval_duration());
+@@ -65,7 +65,7 @@ async fn daemon(config: &RuntimeConfig, state: &mut PersistedState, paths: &Runt
+     reconcile.tick().await;
+     loop {
+         tokio::select! {
+-            _ = checks.tick() => if let Err(error) = check(config, state, paths).await { error!(?error, "periodic update check failed"); },
++            _ = checks.tick() => if let Err(error) = check(config, state, paths, false).await { error!(?error, "periodic update check failed"); },
+             _ = reconcile.tick() => if state.status == UpdateStatus::WaitingForAppExit && !liveness::is_app_running(config)? {
+                 if let Err(error) = install_ready(config, state, paths, false).await { error!(?error, "deferred install failed"); }
+             },
+@@ -75,11 +75,24 @@ async fn daemon(config: &RuntimeConfig, state: &mut PersistedState, paths: &Runt
+     Ok(())
+ }
+ 
+-async fn check(config: &RuntimeConfig, state: &mut PersistedState, paths: &RuntimePaths) -> Result<()> {
++async fn check(
++    config: &RuntimeConfig,
++    state: &mut PersistedState,
++    paths: &RuntimePaths,
++    explicit_retry: bool,
++) -> Result<()> {
+     let _lock = match CheckLock::try_acquire(&paths.state_dir.join("check.lock"))? {
+         Some(lock) => lock,
+         None => { info!("another update check is active"); return Ok(()); }
+     };
++    // Another updater process may have installed a package and persisted its
++    // result while this daemon was waiting for the lock. Refresh durable state
++    // before deciding whether the candidate still needs work.
++    *state = PersistedState::load_or_default(&paths.state_file, config.auto_install_on_app_exit)?;
++    state.installed_version = install::installed_package_version();
++    if explicit_retry && state.status == UpdateStatus::Failed {
++        state.status = UpdateStatus::Idle;
++    }
+     let previous_status = state.status.clone();
+     let previous_candidate = state.candidate_version.clone();
+     let previous_sha256 = state.upstream_package_sha256.clone();
+diff --git a/updater/src/builder.rs b/updater/src/builder.rs
+index 00f51cc..b9799a3 100644
+--- a/updater/src/builder.rs
++++ b/updater/src/builder.rs
+@@ -170,8 +170,15 @@ async fn read_stream<R: tokio::io::AsyncRead + Unpin>(stream: R) -> Result<Strin
+ fn find_package(dist: &Path) -> Result<PathBuf> {
+     let mut matches = Vec::new();
+     for entry in fs::read_dir(dist).with_context(|| format!("Failed to read {}", dist.display()))? {
+-        let path = entry?.path();
++        let entry = entry?;
++        if !entry.file_type()?.is_file() {
++            continue;
++        }
++        let path = entry.path();
+         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
++        if name.contains("-latest.pkg.tar.") {
++            continue;
++        }
+         if name.ends_with(".deb") || name.ends_with(".rpm") || name.contains(".pkg.tar.") {
+             matches.push(path);
+         }
+@@ -189,6 +196,22 @@ mod tests {
+         assert_eq!(safe_component("26.1/../../x"), "26.1_.._.._x");
+     }
+ 
++    #[cfg(unix)]
++    #[test]
++    fn package_discovery_ignores_latest_symlink() -> Result<()> {
++        use std::os::unix::fs::symlink;
++
++        let root = tempfile::tempdir()?;
++        let package = root.path().join("codex-desktop-2026.08.13.1-1-x86_64.pkg.tar.zst");
++        fs::write(&package, b"package")?;
++        symlink(
++            package.file_name().context("missing package file name")?,
++            root.path().join("codex-desktop-latest.pkg.tar.zst"),
++        )?;
++        assert_eq!(find_package(root.path())?, package);
++        Ok(())
++    }
++
+     #[test]
+     fn builder_bundle_copies_optional_prebuilt_artifacts_without_requiring_them() {
+         let root = std::env::temp_dir().join(format!(
+diff --git a/updater/src/config.rs b/updater/src/config.rs
+index 9db055a..d639d70 100644
+--- a/updater/src/config.rs
++++ b/updater/src/config.rs
+@@ -3,7 +3,7 @@
+ use anyhow::{Context, Result};
+ use directories::BaseDirs;
+ use serde::{Deserialize, Serialize};
+-use std::{fs, path::PathBuf, time::Duration};
++use std::{fs, path::{Path, PathBuf}, time::Duration};
+ 
+ const SERVICE_NAME: &str = "codex-update-manager";
+ 
+@@ -87,10 +87,20 @@ impl RuntimeConfig {
+             ..Self::default()
+         };
+         if !value.builder_bundle_root.exists() {
+-            value.builder_bundle_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+-                .parent()
+-                .expect("updater lives below repository root")
+-                .to_path_buf();
++            // Development fallback. Resolve relative to the executable at
++            // runtime so release binaries do not embed the build machine's
++            // CARGO_MANIFEST_DIR (and therefore makepkg's temporary srcdir).
++            let repository_root = std::env::current_dir()
++                .ok()
++                .and_then(|directory| find_repository_root(&directory))
++                .or_else(|| {
++                    std::env::current_exe().ok().and_then(|executable| {
++                        find_repository_root(executable.parent()?)
++                    })
++                });
++            if let Some(repository_root) = repository_root {
++                value.builder_bundle_root = repository_root;
++            }
+         }
+         value
+     }
+@@ -129,6 +139,13 @@ impl RuntimeConfig {
+     }
+ }
+ 
++fn find_repository_root(start: &Path) -> Option<PathBuf> {
++    start
++        .ancestors()
++        .find(|ancestor| ancestor.join("install.sh").is_file())
++        .map(PathBuf::from)
++}
++
+ pub fn effective_feature_config_path(config: &RuntimeConfig) -> Option<PathBuf> {
+     config
+         .feature_config_path
+@@ -149,4 +166,15 @@ mod tests {
+         assert_eq!(config.app_executable_path, PathBuf::from("/opt/codex-desktop/ChatGPT"));
+         Ok(())
+     }
++
++    #[test]
++    fn development_fallback_finds_repository_from_working_directory() -> Result<()> {
++        let root = tempfile::tempdir()?;
++        let updater_dir = root.path().join("updater");
++        fs::create_dir_all(&updater_dir)?;
++        fs::write(root.path().join("install.sh"), "#!/bin/sh\n")?;
++
++        assert_eq!(find_repository_root(&updater_dir), Some(root.path().to_path_buf()));
++        Ok(())
++    }
+ }

@@ -1,42 +1,34 @@
-# Distribution Notes
+# Distribution notes
 
-This repository is safe to publish as automation and packaging glue.
+This repository is packaging automation for Arch/CachyOS. It uses
+`ilysenko/codex-desktop-linux` to verify OpenAI's signed stable APT metadata,
+validate the selected official Linux package, and build a pacman package.
+OpenAI's preview documentation currently lists Ubuntu, Debian, and Fedora;
+Arch/CachyOS support in this repository remains community-maintained.
 
-The Linux conversion approach is based on the work of
-[ilysenko/codex-desktop-linux](https://github.com/ilysenko/codex-desktop-linux).
-This repository packages that local conversion workflow for Arch/CachyOS and
-AUR-style installation.
+## Source and trust model
 
-Publishing converted Codex Desktop binary packages is a separate question:
+- OpenAI's signed Linux `.deb` is the application source.
+- The signature chain is pinned repository key → `InRelease` → `Packages`
+  SHA-256 → package SHA-256.
+- Upstream maintainer scripts are not executed; only the data payload is used.
+- With no optional ASAR feature enabled, the official `resources/app.asar`
+  remains byte-for-byte identical.
+- The old macOS DMG conversion and its redistribution caveat no longer apply.
 
-- The generated package contains OpenAI Codex Desktop application payload copied
-  from the upstream macOS DMG.
-- The upstream Linux wrapper project describes itself as a conversion tool and
-  states that it does not redistribute OpenAI software.
-- A public GitHub Release artifact or AUR `-bin` package would redistribute that
-  payload.
+The AUR recipe pins a concrete upstream commit and official package hash. The
+local latest-build script follows the signed stable index and records the
+resolved version and digest inside the application build metadata.
 
-Recommended public default:
+## Binary artifacts
 
-1. Publish this repository without binary artifacts.
-2. Make the AUR package build from the official upstream DMG on the user's
-   machine.
-3. Keep GitHub Actions artifact upload disabled unless the repository is private
-   or redistribution has been cleared.
-4. Treat prebuilt mode as an explicit opt-in for trusted machines:
-   `PREBUILT=1 yay -S codex-desktop-bin`.
+A generated package contains OpenAI application binaries. The repository's MIT
+license applies only to this project's packaging code and documentation; it
+does not grant rights to redistribute OpenAI's payload. Keep public binary
+publishing disabled unless the relevant distribution terms have been reviewed.
 
-The `aur/PKGBUILD` file follows this shape: local build by default, optional
-prebuilt install only when the user sets `PREBUILT=1`.
+## Package migration
 
-## Disclaimer Text
-
-Use the root [DISCLAIMER.md](../DISCLAIMER.md) as the canonical disclaimer.
-Important points:
-
-- This project is unofficial and not affiliated with OpenAI.
-- OpenAI/Codex names and assets belong to their respective rights holders.
-- Users run local builds and optional prebuilt installs at their own risk.
-- Public prebuilt artifacts may redistribute converted Codex Desktop payload,
-  so local build remains the public default.
-- Rights holders can contact the maintainer for review/removal.
+The runtime-compatible package identity is `codex-desktop`. It replaces the
+historical `codex-desktop-bin` package in one pacman transaction. Package
+removal and replacement preserve `~/.codex` and other user-owned state.

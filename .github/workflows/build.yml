@@ -1,4 +1,4 @@
-name: Build Codex Desktop
+name: Build ChatGPT Community for Arch
 
 on:
   workflow_dispatch:
@@ -17,7 +17,7 @@ on:
         type: boolean
         default: true
       upload_artifact:
-        description: "Upload binary artifact. May redistribute Codex Desktop payload; keep false unless permitted."
+        description: "Upload binary artifact. May redistribute OpenAI payload; keep false unless permitted."
         required: true
         type: boolean
         default: false
@@ -33,7 +33,7 @@ jobs:
       - name: Install CI tools
         run: |
           pacman -Syu --noconfirm
-          pacman -S --needed --noconfirm git nodejs npm python 7zip curl unzip zstd base-devel rust
+          pacman -S --needed --noconfirm base-devel curl dpkg git gnupg nodejs npm python rust
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,14 +47,14 @@ jobs:
 
       - name: Show package metadata
         run: |
-          pacman -Qip dist/codex-desktop-bin-latest.pkg.tar.zst
+          pacman -Qip dist/codex-desktop-latest.pkg.tar.zst
           sha256sum dist/*.pkg.tar.zst
 
       - name: Upload package artifact
         if: ${{ inputs.upload_artifact }}
         uses: actions/upload-artifact@v4
         with:
-          name: codex-desktop-bin-x86_64
+          name: codex-desktop-x86_64
           path: |
             dist/*.pkg.tar.zst
             dist/*.sha256

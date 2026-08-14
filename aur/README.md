@@ -1,58 +1,26 @@
-# AUR package: codex-desktop-bin
+# AUR package: codex-desktop
 
-This directory contains the AUR package files.
+This directory contains the AUR-style package files for ChatGPT Community on
+Arch Linux and derivatives. The source application is OpenAI's official Linux
+package; `ilysenko/codex-desktop-linux` verifies and repackages it as a native
+pacman package.
 
-This package is based on the Linux conversion workflow from
-[ilysenko/codex-desktop-linux](https://github.com/ilysenko/codex-desktop-linux).
-This project is unofficial and is not affiliated with OpenAI.
+The package is named `codex-desktop` for compatibility with its bundled update
+manager. It declares `replaces=('codex-desktop-bin')`, so pacman can migrate
+legacy installations without deleting `~/.codex`.
 
-Default install:
-
-```bash
-yay -S codex-desktop-bin
-```
-
-or:
+Build:
 
 ```bash
-paru -S codex-desktop-bin
+makepkg -s
 ```
 
-Default behavior is local-build. It downloads the official Codex DMG and builds
-the Linux package on the user's machine.
-
-When yay/paru asks whether to clean build, choose clean build to force a fresh
-Codex DMG download. Otherwise the helper may reuse its cached sources.
-
-Fast trusted prebuilt mode:
-
-```bash
-PREBUILT=1 yay -S codex-desktop-bin
-```
-
-Optional overrides:
-
-```bash
-PREBUILT=1 PREBUILT_URL=https://example.com/codex-desktop-bin-x86_64.pkg.tar.zst yay -S codex-desktop-bin
-PREBUILT=1 PREBUILT_SHA256=<sha256> yay -S codex-desktop-bin
-```
-
-Update `.SRCINFO` after changing `PKGBUILD`:
+Refresh metadata after editing `PKGBUILD`:
 
 ```bash
 makepkg --printsrcinfo > .SRCINFO
 ```
 
-Publish to AUR:
-
-```bash
-git clone ssh://aur@aur.archlinux.org/codex-desktop-bin.git
-cp PKGBUILD .SRCINFO codex-desktop-bin/
-cd codex-desktop-bin
-git add PKGBUILD .SRCINFO
-git commit -m "Initial import"
-git push
-```
-
-Before publishing, review the root `DISCLAIMER.md`. If a rights holder requests
-removal, disable prebuilt artifacts and/or remove the AUR package as appropriate.
+Before publishing a version bump, resolve the current official package through
+the signed stable index and update `pkgver`, architecture-specific URLs, and
+SHA-256 values together. Do not use a `latest` URL as an AUR trust root.
