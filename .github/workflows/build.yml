@@ -1,4 +1,4 @@
-name: Build ChatGPT Community for Arch
+name: Publish ChatGPT Community pacman repository
 
 on:
   workflow_dispatch:
@@ -11,52 +11,133 @@ on:
         description: "Build/compression threads"
         required: true
         default: "4"
-      package_with_updater:
-        description: "Include codex-update-manager"
-        required: true
-        type: boolean
-        default: true
-      upload_artifact:
-        description: "Upload binary artifact. May redistribute OpenAI payload; keep false unless permitted."
-        required: true
-        type: boolean
-        default: false
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build.yml"
+      - "aur/arch-legacy-package.patch"
+      - "scripts/build-latest.sh"
+      - "scripts/prepare-pacman-release.sh"
+      - "scripts/setup-pacman-repo.sh"
+  schedule:
+    - cron: "23 */6 * * *"
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: publish-pacman-repository
+  cancel-in-progress: false
 
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     container: archlinux:base-devel
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_DIR: ${{ github.workspace }}/release
+
     steps:
       - name: Install CI tools
         run: |
           pacman -Syu --noconfirm
-          pacman -S --needed --noconfirm base-devel curl dpkg git gnupg nodejs npm python rust
+          pacman -S --needed --noconfirm base-devel curl dpkg git github-cli gnupg nodejs npm python rust
 
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare unprivileged builder
+        run: |
+          useradd --create-home --shell /bin/bash builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+
       - name: Build package
+        env:
+          UPSTREAM_REF: ${{ inputs.upstream_ref || 'main' }}
+          MAX_BUILD_THREADS: ${{ inputs.max_build_threads || '4' }}
         run: |
-          MAX_BUILD_THREADS="${{ inputs.max_build_threads }}" \
-          UPSTREAM_REF="${{ inputs.upstream_ref }}" \
-          PACKAGE_WITH_UPDATER="${{ inputs.package_with_updater && '1' || '0' }}" \
-          ./scripts/build-latest.sh
+          package_version="$(date -u +%Y.%m.%d.%H%M%S)"
+          runuser -u builder -- env \
+            CARGO_HOME="$GITHUB_WORKSPACE/.work/cargo-home" \
+            MAX_BUILD_THREADS="$MAX_BUILD_THREADS" \
+            npm_config_cache="$GITHUB_WORKSPACE/.work/npm-cache" \
+            PACKAGE_VERSION="$package_version" \
+            PACKAGE_WITH_UPDATER=1 \
+            UPSTREAM_REF="$UPSTREAM_REF" \
+            ./scripts/build-latest.sh
 
-      - name: Show package metadata
+      - name: Prepare release assets
+        id: package
+        env:
+          PACKAGING_COMMIT: ${{ github.sha }}
+          PACKAGING_REPOSITORY: ${{ github.repository }}
+          UPSTREAM_REF: ${{ inputs.upstream_ref || 'main' }}
+          WORKFLOW_RUN_URL: ${{ format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
         run: |
-          pacman -Qip dist/codex-desktop-latest.pkg.tar.zst
-          sha256sum dist/*.pkg.tar.zst
+          ./scripts/prepare-pacman-release.sh
 
-      - name: Upload package artifact
-        if: ${{ inputs.upload_artifact }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: codex-desktop-x86_64
-          path: |
-            dist/*.pkg.tar.zst
-            dist/*.sha256
-          if-no-files-found: error
-          retention-days: 7
+      - name: Compare latest release
+        id: release
+        run: |
+          previous_dir="$RUNNER_TEMP/previous-release"
+          mkdir -p "$previous_dir"
+          previous_key=""
+          if gh release download --repo "$GITHUB_REPOSITORY" --pattern release-metadata.json --dir "$previous_dir" >/dev/null 2>&1; then
+            previous_key="$(node -p "require('$previous_dir/release-metadata.json').candidateKey || ''")"
+          fi
+          if [ "$previous_key" = "${{ steps.package.outputs.candidate_key }}" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write release notes
+        if: steps.release.outputs.publish == 'true'
+        run: |
+          cat > "$RELEASE_DIR/release-notes.md" <<'EOF'
+          Prebuilt Arch/CachyOS package for **ChatGPT Community** (`codex-desktop`).
+
+          One-time repository setup:
+
+          ```bash
+          curl -fsSL https://raw.githubusercontent.com/JuckZ/codex-desktop-bin/main/scripts/setup-pacman-repo.sh | sudo bash
+          ```
+
+          Install or update:
+
+          ```bash
+          sudo pacman -Syu juckz/codex-desktop
+          ```
+
+          The package contains OpenAI application payload from the signed official Linux repository. This is an unofficial community package and is not supported or endorsed by OpenAI. The pacman repository is currently unsigned; transport is protected by HTTPS and package hashes are stored in `juckz.db`.
+          EOF
+
+      - name: Publish GitHub Release
+        if: steps.release.outputs.publish == 'true'
+        run: |
+          tag="pacman-${{ steps.package.outputs.package_version }}"
+          gh release create "$tag" \
+            "$RELEASE_DIR/${{ steps.package.outputs.package_file }}" \
+            "$RELEASE_DIR/${{ steps.package.outputs.package_file }}.sha256" \
+            "$RELEASE_DIR/juckz.db" \
+            "$RELEASE_DIR/juckz.db.tar.gz" \
+            "$RELEASE_DIR/juckz.files" \
+            "$RELEASE_DIR/juckz.files.tar.gz" \
+            "$RELEASE_DIR/build-info.json" \
+            "$RELEASE_DIR/release-metadata.json" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "codex-desktop ${{ steps.package.outputs.package_version }}" \
+            --notes-file "$RELEASE_DIR/release-notes.md" \
+            --latest
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.release.outputs.publish }}" = true ]; then
+            printf '### Published codex-desktop %s\n\n' '${{ steps.package.outputs.package_version }}' >> "$GITHUB_STEP_SUMMARY"
+            printf 'OpenAI app: `%s`\n\n' '${{ steps.package.outputs.upstream_version }}' >> "$GITHUB_STEP_SUMMARY"
+            printf 'Install: `sudo pacman -Syu juckz/codex-desktop`\n' >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '### No release needed\n\nThe upstream payload and packaging source match the latest release.\n' >> "$GITHUB_STEP_SUMMARY"
+          fi

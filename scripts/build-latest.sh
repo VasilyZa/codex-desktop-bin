@@ -13,6 +13,7 @@ PACKAGE_NAME="codex-desktop"
 PACKAGE_DISPLAY_NAME="${PACKAGE_DISPLAY_NAME:-ChatGPT Community}"
 PACKAGE_COMMENT="${PACKAGE_COMMENT:-Community Linux distribution based on OpenAI ChatGPT}"
 PACKAGE_WITH_UPDATER="${PACKAGE_WITH_UPDATER:-1}"
+PACKAGE_VERSION="${PACKAGE_VERSION:-}"
 
 if [ -z "${MAX_BUILD_THREADS:-}" ]; then
   if command -v nproc >/dev/null 2>&1; then
@@ -98,7 +99,7 @@ printf 'Building %s from %s at %s\n' \
   fi
   CODEX_APP_ID=codex-desktop \
     CODEX_APP_DISPLAY_NAME="$PACKAGE_DISPLAY_NAME" \
-    UPSTREAM_DEB= \
+    UPSTREAM_DEB='' \
     ./install.sh "${build_app_args[@]}"
 
   build_info="$build_dir/codex-app/.codex-linux/build-info.json"
@@ -112,18 +113,26 @@ printf 'Building %s from %s at %s\n' \
     if (!/^[0-9][0-9A-Za-z.+:~-]*$/.test(version ?? "")) process.exit(1);
     process.stdout.write(version);
   ' "$build_info")"
-  package_version="$(date -u +%Y.%m.%d.%H%M%S)"
+  package_version="$PACKAGE_VERSION"
+  if [ -z "$package_version" ]; then
+    package_version="$(date -u +%Y.%m.%d.%H%M%S)"
+  fi
+  if [[ ! "$package_version" =~ ^[0-9][0-9A-Za-z._+]*$ ]]; then
+    printf 'Invalid PACKAGE_VERSION: %s\n' "$package_version" >&2
+    exit 1
+  fi
   printf 'Resolved OpenAI package %s; native package version %s\n' \
     "$upstream_version" "$package_version"
 
+  cargo_target_dir="${CARGO_TARGET_DIR:-$REPO_ROOT/.work/cargo-target}"
   MAX_BUILD_THREADS="$MAX_BUILD_THREADS" \
-    CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$REPO_ROOT/.work/cargo-target}" \
+    CARGO_TARGET_DIR="$cargo_target_dir" \
     PACKAGE_NAME="$PACKAGE_NAME" \
     PACKAGE_VERSION="$package_version" \
     PACKAGE_DISPLAY_NAME="$PACKAGE_DISPLAY_NAME" \
     PACKAGE_COMMENT="$PACKAGE_COMMENT" \
     PACKAGE_WITH_UPDATER="$PACKAGE_WITH_UPDATER" \
-    UPDATER_BINARY_SOURCE="${CARGO_TARGET_DIR:-$REPO_ROOT/.work/cargo-target}/release/codex-update-manager" \
+    UPDATER_BINARY_SOURCE="$cargo_target_dir/release/codex-update-manager" \
     make -e pacman
 )
 
@@ -138,7 +147,10 @@ fi
 dest="$OUTPUT_DIR/$(basename "$latest_pkg")"
 cp "$latest_pkg" "$dest"
 ln -sfn "$(basename "$dest")" "$OUTPUT_DIR/$PACKAGE_NAME-latest.pkg.tar.zst"
-sha256sum "$dest" > "$dest.sha256"
+(
+  cd "$OUTPUT_DIR"
+  sha256sum "$(basename "$dest")" > "$(basename "$dest").sha256"
+)
 
 printf '\nBuilt package:\n  %s\n' "$dest"
 printf 'Latest symlink:\n  %s\n' "$OUTPUT_DIR/$PACKAGE_NAME-latest.pkg.tar.zst"

@@ -29,7 +29,34 @@ Debian, and Fedora releases. Arch/CachyOS is not listed as a supported target,
 so this repository remains the compatibility and pacman-packaging layer for
 those systems. See the [official Linux app documentation](https://developers.openai.com/codex/linux/linux-app/).
 
-## Build and install on Arch/CachyOS
+## Install on Arch/CachyOS
+
+Prebuilt x86_64 packages are published as a pacman repository backed by the
+latest GitHub Release. Configure the repository once:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JuckZ/codex-desktop-bin/main/scripts/setup-pacman-repo.sh | sudo bash
+```
+
+Then install or update with the normal full-system upgrade transaction:
+
+```bash
+sudo pacman -Syu juckz/codex-desktop
+```
+
+The package is named `codex-desktop`; `codex-desktop-bin` is only the
+historical repository name and legacy package identity. Avoid `pacman -Sy`
+without `-u`, because Arch does not support partial upgrades.
+
+The public repository is currently unsigned. Its database and packages are
+served over HTTPS, and pacman verifies the package SHA-256 recorded in
+`juckz.db`. See [the distribution notes](docs/DISTRIBUTION.md) for the trust
+model and binary redistribution notice.
+
+## Build locally
+
+Local building remains available for development, auditing, aarch64, or as a
+fallback if a prebuilt release is unavailable.
 
 Install build dependencies:
 
@@ -64,6 +91,13 @@ codex-update-manager status --json
 
 ## Updating
 
+For installations configured through the `juckz` repository, normal system
+updates install new releases:
+
+```bash
+sudo pacman -Syu
+```
+
 The installed updater checks OpenAI's signed stable repository and rebuilds the
 native package with the same feature selection:
 
@@ -72,7 +106,7 @@ codex-update-manager check-now
 codex-update-manager status
 ```
 
-To update explicitly through this repository instead:
+To update explicitly by rebuilding this repository instead:
 
 ```bash
 git pull --ff-only

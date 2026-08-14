@@ -26,7 +26,10 @@ availability, or continued functionality.
 Generated packages contain OpenAI application payload from the official Linux
 package. Redistribution rights for that payload are separate from this
 repository's MIT-licensed scripts and documentation. Do not assume the MIT
-license grants permission to redistribute generated binaries.
+license grants permission to redistribute generated binaries. The repository
+owner publishes prebuilt community packages after accepting this separate
+redistribution risk; that choice does not grant downstream redistribution
+rights or alter OpenAI's rights in the bundled payload.
 
 ## Rights-holder contact
 
