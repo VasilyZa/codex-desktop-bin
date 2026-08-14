@@ -22,12 +22,13 @@ resolved version and digest inside the application build metadata.
 
 ## Prebuilt pacman repository
 
-Successful release workflows publish the x86_64 package, its SHA-256 file,
-build provenance, and `juckz.db` as assets of the latest GitHub Release. The
-stable repository endpoint is:
+Successful source workflows publish the x86_64 package, its SHA-256 file, and
+build provenance as assets of the latest GitHub Release. `JuckZ/arch-repo`
+independently verifies those assets, signs the package and repository database,
+and publishes the rolling pacman repository at:
 
 ```text
-https://github.com/JuckZ/codex-desktop-bin/releases/latest/download
+https://github.com/JuckZ/arch-repo/releases/download/repository-$arch
 ```
 
 After the one-time repository setup, install or update with:
@@ -36,15 +37,16 @@ After the one-time repository setup, install or update with:
 sudo pacman -Syu juckz/codex-desktop
 ```
 
-The workflow runs after relevant changes to `main`, on manual dispatch, and on
-a six-hour schedule. It publishes only when the signed OpenAI payload or the
-packaging source differs from the latest release. Release assets currently
-target x86_64; aarch64 remains a local-build path.
+The source workflow runs after relevant changes to `main`, on manual dispatch,
+and on a six-hour schedule. The signed-repository synchronization runs 30
+minutes later and skips an exact package asset already present in the rolling
+repository. Release assets currently target x86_64; aarch64 remains a
+local-build path.
 
-The pacman repository is not PGP-signed yet. The setup therefore configures
-`SigLevel = Never`; transport uses HTTPS, while the repository database stores
-the package SHA-256. Adding a stable offline-controlled signing key is required
-before changing this to mandatory package and database signature validation.
+The pacman repository uses `SigLevel = Required DatabaseOptional`. Packages and
+the database are signed with fingerprint
+`A361 30B4 88E1 E756 04E6 0A9A 92A8 15DA 30F9 FA93`; the setup script verifies
+that exact public-key fingerprint before importing and locally trusting it.
 
 ## Binary artifacts and redistribution
 

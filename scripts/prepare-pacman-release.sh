@@ -9,7 +9,7 @@ PACKAGING_REPOSITORY="${PACKAGING_REPOSITORY:-JuckZ/codex-desktop-bin}"
 UPSTREAM_REF="${UPSTREAM_REF:-main}"
 WORKFLOW_RUN_URL="${WORKFLOW_RUN_URL:-}"
 
-for command in bsdtar node pacman repo-add sha256sum; do
+for command in bsdtar node pacman sha256sum; do
   command -v "$command" >/dev/null 2>&1 || {
     printf 'Missing required command: %s\n' "$command" >&2
     exit 1
@@ -104,16 +104,7 @@ fs.writeFileSync(
 );
 NODE
 
-(
-  cd "$RELEASE_DIR"
-  repo-add --nocolor juckz.db.tar.gz "$package_file"
-  for repository_link in juckz.db juckz.files; do
-    cp -L "$repository_link" "$repository_link.regular"
-    mv -f "$repository_link.regular" "$repository_link"
-  done
-  bsdtar -tf juckz.db | grep -F '/desc' >/dev/null
-  sha256sum -c "$package_file.sha256"
-)
+(cd "$RELEASE_DIR" && sha256sum -c "$package_file.sha256")
 
 candidate_key="$(node -p "require('$RELEASE_DIR/release-metadata.json').candidateKey")"
 upstream_version="$(node -p "require('$RELEASE_DIR/build-info.json').upstreamLinuxPackage.version")"

@@ -31,8 +31,9 @@ those systems. See the [official Linux app documentation](https://developers.ope
 
 ## Install on Arch/CachyOS
 
-Prebuilt x86_64 packages are published as a pacman repository backed by the
-latest GitHub Release. Configure the repository once:
+Prebuilt x86_64 packages are published as GitHub Releases, then verified,
+signed, and mirrored into the existing `JuckZ/arch-repo` pacman repository.
+Configure its signing key and repository once:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/JuckZ/codex-desktop-bin/main/scripts/setup-pacman-repo.sh | sudo bash
@@ -48,10 +49,9 @@ The package is named `codex-desktop`; `codex-desktop-bin` is only the
 historical repository name and legacy package identity. Avoid `pacman -Sy`
 without `-u`, because Arch does not support partial upgrades.
 
-The public repository is currently unsigned. Its database and packages are
-served over HTTPS, and pacman verifies the package SHA-256 recorded in
-`juckz.db`. See [the distribution notes](docs/DISTRIBUTION.md) for the trust
-model and binary redistribution notice.
+The public repository requires package signatures from the JuckZ repository
+key. See [the distribution notes](docs/DISTRIBUTION.md) for the verification
+chain and binary redistribution notice.
 
 ## Build locally
 
