@@ -1,5 +1,7 @@
 # codex-desktop-bin
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 Arch/CachyOS packaging for **ChatGPT Community**, built from OpenAI's signed
 official Linux ChatGPT package through
 [`ilysenko/codex-desktop-linux`](https://github.com/ilysenko/codex-desktop-linux).
@@ -149,6 +151,12 @@ recommended first. To test native Wayland, add this line to
 ```text
 --ozone-platform=wayland
 ```
+
+## Acknowledgements
+
+Thanks to the [Linux.do](https://linux.do/) community for providing a platform
+and welcoming environment for discussion. The discussions and sharing there
+have been a great help to this project.
 
 ## Disclaimer
 
