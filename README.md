@@ -36,7 +36,18 @@ signed, and mirrored into the existing `JuckZ/arch-repo` pacman repository.
 Configure its signing key and repository once:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JuckZ/codex-desktop-bin/main/scripts/setup-pacman-repo.sh | sudo bash
+setup_script="$(mktemp)"
+trap 'rm -f -- "$setup_script"' EXIT
+
+curl --fail --location --silent --show-error \
+  --output "$setup_script" \
+  https://raw.githubusercontent.com/JuckZ/codex-desktop-bin/main/scripts/setup-pacman-repo.sh
+
+printf '%s  %s\n' \
+  '042499f34cdaabc8ceecadd858ce4840fa5ef66c3b2c22729696c5dc54524f73' \
+  "$setup_script" | sha256sum --check --strict
+
+sudo bash "$setup_script"
 ```
 
 Then install or update with the normal full-system upgrade transaction:

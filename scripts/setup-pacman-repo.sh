@@ -73,6 +73,18 @@ elif pacman-conf --config "$PACMAN_CONFIG" --repo-list \
       exit 1
       ;;
   esac
+  configured_siglevel="$(pacman-conf --config "$PACMAN_CONFIG" \
+    --repo "$REPOSITORY_NAME" \
+    | awk -F ' = ' '$1 == "SigLevel" { print $2; exit }')"
+  case " $configured_siglevel " in
+    *" PackageRequired "*) ;;
+    *)
+      printf '[%s] must require package signatures; found: %s\n' \
+        "$REPOSITORY_NAME" "${configured_siglevel:-unset}" >&2
+      printf 'Set: SigLevel = Required DatabaseOptional\n' >&2
+      exit 1
+      ;;
+  esac
 else
   write_repository_config
   if [ ! -e "${PACMAN_CONFIG}.juckz.bak" ]; then

@@ -1,11 +1,83 @@
+diff --git a/packaging/linux/DISCLAIMER.md b/packaging/linux/DISCLAIMER.md
+new file mode 100644
+index 0000000..0cb4284
+--- /dev/null
++++ b/packaging/linux/DISCLAIMER.md
+@@ -0,0 +1,37 @@
++# Disclaimer
++
++## Acknowledgements
++
++This project uses the verification, Linux packaging, and update workflow from
++[`ilysenko/codex-desktop-linux`](https://github.com/ilysenko/codex-desktop-linux).
++It repackages OpenAI's signed official Linux ChatGPT desktop payload for
++Arch/CachyOS.
++
++## Unofficial project
++
++This project is not created, endorsed, sponsored, reviewed, or supported by
++OpenAI. OpenAI, ChatGPT, Codex, related names, marks, logos, application assets,
++and product materials belong to OpenAI or their respective rights holders.
++
++## User responsibility
++
++Use this project at your own risk. Users are responsible for reviewing package
++scripts, complying with applicable terms and licenses, and protecting their
++credentials and configuration. The maintainers provide the packaging
++automation as-is, without warranty of fitness, security, compatibility,
++availability, or continued functionality.
++
++## Binary distribution
++
++Generated packages contain OpenAI application payload from the official Linux
++package. Redistribution rights for that payload are separate from this
++repository's MIT-licensed scripts and documentation. Do not assume the MIT
++license grants permission to redistribute generated binaries. The repository
++owner publishes prebuilt community packages after accepting this separate
++redistribution risk; that choice does not grant downstream redistribution
++rights or alter OpenAI's rights in the bundled payload.
++
++## Rights-holder contact
++
++Rights holders may request review or removal through a GitHub issue or the
++maintainer email listed in the package recipe.
+diff --git a/packaging/linux/LICENSE.packaging b/packaging/linux/LICENSE.packaging
+new file mode 100644
+index 0000000..b17aeaa
+--- /dev/null
++++ b/packaging/linux/LICENSE.packaging
+@@ -0,0 +1,21 @@
++MIT License
++
++Copyright (c) 2026 JuckZ
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in all
++copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++SOFTWARE.
 diff --git a/packaging/linux/PKGBUILD.template b/packaging/linux/PKGBUILD.template
-index 588dae8..255fce4 100644
+index 588dae8..37edd62 100644
 --- a/packaging/linux/PKGBUILD.template
 +++ b/packaging/linux/PKGBUILD.template
-@@ -6,6 +6,9 @@ pkgdesc="Custom codex-desktop distribution built from OpenAI's official Linux pa
+@@ -5,7 +5,10 @@ pkgrel=__PKGREL__
+ pkgdesc="Custom codex-desktop distribution built from OpenAI's official Linux package"
  arch=('__ARCH__')
  url="https://github.com/ilysenko/codex-desktop-linux"
- license=('MIT')
+-license=('MIT')
++license=('MIT' 'custom')
 +provides=('codex-desktop')
 +conflicts=('codex-desktop-bin' 'openai-codex-desktop')
 +replaces=('codex-desktop-bin')
@@ -30,6 +102,45 @@ index 2277fcb..d778060 100644
      if grep -Eq 'codex-desktop-open-next|^Actions=NewWindow([;]|$)|^\[Desktop Action NewWindow\]$|^Actions=NewInstance([;]|$)|^\[Desktop Action NewInstance\]$' \
          "$codex_desktop_file"; then
          return 0
+diff --git a/scripts/lib/package-common.sh b/scripts/lib/package-common.sh
+index ec90862..611a82e 100755
+--- a/scripts/lib/package-common.sh
++++ b/scripts/lib/package-common.sh
+@@ -845,9 +845,13 @@ write_update_builder_manifest() {
+ stage_common_package_files() {
+     local root="$1"
+     local app_root="$root/opt/$PACKAGE_NAME"
++    local package_disclaimer="$REPO_DIR/packaging/linux/DISCLAIMER.md"
++    local packaging_license="$REPO_DIR/packaging/linux/LICENSE.packaging"
+     local polkit_policy="$REPO_DIR/packaging/linux/com.github.ilysenko.codex-desktop-linux.update.policy"
+ 
+     ensure_app_layout
++    ensure_file_exists "$package_disclaimer" "package disclaimer"
++    ensure_file_exists "$packaging_license" "packaging license"
+ 
+     if package_with_updater_enabled; then
+         ensure_file_exists "$polkit_policy" "polkit policy"
+@@ -858,6 +862,7 @@ stage_common_package_files() {
+         "$root/usr/bin" \
+         "$root/usr/share/applications" \
+         "$root/usr/share/icons/hicolor/256x256/apps" \
++        "$root/usr/share/licenses/$PACKAGE_NAME" \
+         "$root/etc/apparmor.d"
+     if package_with_updater_enabled; then
+         mkdir -p \
+@@ -865,6 +870,12 @@ stage_common_package_files() {
+             "$root/usr/share/polkit-1/actions"
+     fi
+ 
++    install -m 0644 \
++        "$package_disclaimer" \
++        "$root/usr/share/licenses/$PACKAGE_NAME/DISCLAIMER.md"
++    install -m 0644 \
++        "$packaging_license" \
++        "$root/usr/share/licenses/$PACKAGE_NAME/LICENSE.packaging"
+     rm -rf "$app_root"
+     cp -aT "$APP_DIR" "$app_root"
+     mkdir -p "$app_root/.codex-linux"
 diff --git a/updater/src/app.rs b/updater/src/app.rs
 index 323b69d..4ac9579 100644
 --- a/updater/src/app.rs
