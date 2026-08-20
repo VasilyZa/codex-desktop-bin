@@ -32,6 +32,23 @@ package_version="$(LC_ALL=C pacman -Qp "$PACKAGE_PATH" | awk 'NR == 1 { print $2
 package_file="$(basename "$PACKAGE_PATH")"
 package_sha256="$(sha256sum "$PACKAGE_PATH" | awk '{ print $1 }')"
 package_architecture="$(bsdtar -xOf "$PACKAGE_PATH" .PKGINFO | awk '$1 == "arch" { print $3; exit }')"
+if [[ ! "$package_version" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}\.[0-9]{6}-[1-9][0-9]*$ ]]; then
+  printf 'Refusing unexpected package version: %s\n' "$package_version" >&2
+  exit 1
+fi
+[ "$package_architecture" = x86_64 ] || {
+  printf 'Refusing unexpected package architecture: %s\n' "$package_architecture" >&2
+  exit 1
+}
+expected_package_file="${package_name}-${package_version}-${package_architecture}.pkg.tar.zst"
+[ "$package_file" = "$expected_package_file" ] || {
+  printf 'Package file name does not match metadata: %s\n' "$package_file" >&2
+  exit 1
+}
+[[ "$package_sha256" =~ ^[0-9a-f]{64}$ ]] || {
+  printf 'Invalid package SHA-256\n' >&2
+  exit 1
+}
 build_info_path=""
 while IFS= read -r archive_path; do
   if [[ "$archive_path" =~ (^|/)\.codex-linux/build-info\.json$ ]]; then
@@ -59,6 +76,7 @@ PACKAGE_SHA256="$package_sha256" \
 PACKAGE_VERSION="$package_version" \
 PACKAGING_COMMIT="$PACKAGING_COMMIT" \
 PACKAGING_REPOSITORY="$PACKAGING_REPOSITORY" \
+RELEASE_DIR="$RELEASE_DIR" \
 UPSTREAM_REF="$UPSTREAM_REF" \
 WORKFLOW_RUN_URL="$WORKFLOW_RUN_URL" \
 node <<'NODE'
@@ -69,11 +87,23 @@ const path = require("node:path");
 const info = JSON.parse(
   fs.readFileSync(path.join(process.env.RELEASE_DIR, "build-info.json"), "utf8"),
 );
+const upstreamVersion = info.upstreamLinuxPackage?.version;
+const upstreamPayloadSha256 = info.upstreamLinuxPackage?.sha256;
+const upstreamSourceCommit = info.source?.commit;
+if (!/^[0-9][0-9A-Za-z.+:~-]*$/.test(upstreamVersion ?? "")) {
+  throw new Error("invalid upstream package version");
+}
+if (!/^[0-9a-f]{64}$/.test(upstreamPayloadSha256 ?? "")) {
+  throw new Error("invalid upstream package SHA-256");
+}
+if (!/^[0-9a-f]{40,64}$/.test(upstreamSourceCommit ?? "")) {
+  throw new Error("invalid upstream source commit");
+}
 const identity = {
   architecture: process.env.PACKAGE_ARCHITECTURE,
   packagingCommit: process.env.PACKAGING_COMMIT,
-  upstreamPayloadSha256: info.upstreamLinuxPackage.sha256,
-  upstreamSourceCommit: info.source.commit,
+  upstreamPayloadSha256,
+  upstreamSourceCommit,
 };
 const candidateKey = crypto
   .createHash("sha256")
@@ -106,8 +136,14 @@ NODE
 
 (cd "$RELEASE_DIR" && sha256sum -c "$package_file.sha256")
 
-candidate_key="$(node -p "require('$RELEASE_DIR/release-metadata.json').candidateKey")"
-upstream_version="$(node -p "require('$RELEASE_DIR/build-info.json').upstreamLinuxPackage.version")"
+candidate_key="$(
+  RELEASE_METADATA_PATH="$RELEASE_DIR/release-metadata.json" \
+    node -p 'require(process.env.RELEASE_METADATA_PATH).candidateKey'
+)"
+upstream_version="$(
+  BUILD_INFO_PATH="$RELEASE_DIR/build-info.json" \
+    node -p 'require(process.env.BUILD_INFO_PATH).upstreamLinuxPackage.version'
+)"
 
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   {
