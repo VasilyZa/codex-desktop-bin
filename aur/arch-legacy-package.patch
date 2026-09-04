@@ -198,50 +198,6 @@ index 323b69d..4ac9579 100644
      let previous_status = state.status.clone();
      let previous_candidate = state.candidate_version.clone();
      let previous_sha256 = state.upstream_package_sha256.clone();
-diff --git a/updater/src/builder.rs b/updater/src/builder.rs
-index 00f51cc..b9799a3 100644
---- a/updater/src/builder.rs
-+++ b/updater/src/builder.rs
-@@ -170,8 +170,15 @@ async fn read_stream<R: tokio::io::AsyncRead + Unpin>(stream: R) -> Result<Strin
- fn find_package(dist: &Path) -> Result<PathBuf> {
-     let mut matches = Vec::new();
-     for entry in fs::read_dir(dist).with_context(|| format!("Failed to read {}", dist.display()))? {
--        let path = entry?.path();
-+        let entry = entry?;
-+        if !entry.file_type()?.is_file() {
-+            continue;
-+        }
-+        let path = entry.path();
-         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-+        if name.contains("-latest.pkg.tar.") {
-+            continue;
-+        }
-         if name.ends_with(".deb") || name.ends_with(".rpm") || name.contains(".pkg.tar.") {
-             matches.push(path);
-         }
-@@ -189,6 +196,22 @@ mod tests {
-         assert_eq!(safe_component("26.1/../../x"), "26.1_.._.._x");
-     }
- 
-+    #[cfg(unix)]
-+    #[test]
-+    fn package_discovery_ignores_latest_symlink() -> Result<()> {
-+        use std::os::unix::fs::symlink;
-+
-+        let root = tempfile::tempdir()?;
-+        let package = root.path().join("codex-desktop-2026.08.13.1-1-x86_64.pkg.tar.zst");
-+        fs::write(&package, b"package")?;
-+        symlink(
-+            package.file_name().context("missing package file name")?,
-+            root.path().join("codex-desktop-latest.pkg.tar.zst"),
-+        )?;
-+        assert_eq!(find_package(root.path())?, package);
-+        Ok(())
-+    }
-+
-     #[test]
-     fn builder_bundle_copies_optional_prebuilt_artifacts_without_requiring_them() {
-         let root = std::env::temp_dir().join(format!(
 diff --git a/updater/src/config.rs b/updater/src/config.rs
 index 9db055a..d639d70 100644
 --- a/updater/src/config.rs
