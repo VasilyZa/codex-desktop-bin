@@ -163,15 +163,11 @@ index 323b69d..4ac9579 100644
          error!(?error, "initial update check failed");
      }
      let mut checks = time::interval(config.check_interval_duration());
-@@ -65,7 +65,7 @@ async fn daemon(config: &RuntimeConfig, state: &mut PersistedState, paths: &Runt
-     reconcile.tick().await;
-     loop {
+@@ -67,3 +67,3 @@ async fn daemon(config: &RuntimeConfig, state: &mut PersistedState, paths: &Runt
          tokio::select! {
 -            _ = checks.tick() => if let Err(error) = check(config, state, paths).await { error!(?error, "periodic update check failed"); },
 +            _ = checks.tick() => if let Err(error) = check(config, state, paths, false).await { error!(?error, "periodic update check failed"); },
              _ = reconcile.tick() => if state.status == UpdateStatus::WaitingForAppExit && !liveness::is_app_running(config)? {
-                 if let Err(error) = install_ready(config, state, paths, false).await { error!(?error, "deferred install failed"); }
-             },
 @@ -75,11 +75,24 @@ async fn daemon(config: &RuntimeConfig, state: &mut PersistedState, paths: &Runt
      Ok(())
  }
