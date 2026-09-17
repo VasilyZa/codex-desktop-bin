@@ -1,6 +1,6 @@
 diff --git a/packaging/linux/DISCLAIMER.md b/packaging/linux/DISCLAIMER.md
 new file mode 100644
-index 0000000..0cb4284
+index 0000000000000000000000000000000000000000..0cb428446303d63344cf343d1124916d80970990
 --- /dev/null
 +++ b/packaging/linux/DISCLAIMER.md
 @@ -0,0 +1,37 @@
@@ -43,7 +43,7 @@ index 0000000..0cb4284
 +maintainer email listed in the package recipe.
 diff --git a/packaging/linux/LICENSE.packaging b/packaging/linux/LICENSE.packaging
 new file mode 100644
-index 0000000..b17aeaa
+index 0000000000000000000000000000000000000000..b17aeaa52723bc00ee58aa1f91c3885ee5585b0f
 --- /dev/null
 +++ b/packaging/linux/LICENSE.packaging
 @@ -0,0 +1,21 @@
@@ -69,7 +69,7 @@ index 0000000..b17aeaa
 +OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 +SOFTWARE.
 diff --git a/packaging/linux/PKGBUILD.template b/packaging/linux/PKGBUILD.template
-index 588dae8..37edd62 100644
+index 588dae8855e9d087943b9256509190deea1dd310..37edd62fbd06c8d27039b67e010ddef959c36025 100644
 --- a/packaging/linux/PKGBUILD.template
 +++ b/packaging/linux/PKGBUILD.template
 @@ -5,7 +5,10 @@ pkgrel=__PKGREL__
@@ -85,7 +85,7 @@ index 588dae8..37edd62 100644
      'polkit'
      'curl'
 diff --git a/packaging/linux/codex-desktop-entry-doctor.sh b/packaging/linux/codex-desktop-entry-doctor.sh
-index 2277fcb..d778060 100644
+index 2277fcb11244e1fcc77a330ac91c5d9e26413f0e..d7780607a5ed48a2f89f10b3b2db30658a65814d 100644
 --- a/packaging/linux/codex-desktop-entry-doctor.sh
 +++ b/packaging/linux/codex-desktop-entry-doctor.sh
 @@ -38,6 +38,13 @@ codex_desktop_entry_is_legacy_generated() {
@@ -103,10 +103,10 @@ index 2277fcb..d778060 100644
          "$codex_desktop_file"; then
          return 0
 diff --git a/scripts/lib/package-common.sh b/scripts/lib/package-common.sh
-index ec90862..611a82e 100755
+index 25816976da1a2dc274ad190afb106927d10d49f0..f8597db109dda5a923bce99af1555e63246cd3f6 100755
 --- a/scripts/lib/package-common.sh
 +++ b/scripts/lib/package-common.sh
-@@ -845,9 +845,13 @@ write_update_builder_manifest() {
+@@ -879,9 +879,13 @@ write_update_builder_manifest() {
  stage_common_package_files() {
      local root="$1"
      local app_root="$root/opt/$PACKAGE_NAME"
@@ -120,7 +120,7 @@ index ec90862..611a82e 100755
  
      if package_with_updater_enabled; then
          ensure_file_exists "$polkit_policy" "polkit policy"
-@@ -858,6 +862,7 @@ stage_common_package_files() {
+@@ -892,6 +896,7 @@ stage_common_package_files() {
          "$root/usr/bin" \
          "$root/usr/share/applications" \
          "$root/usr/share/icons/hicolor/256x256/apps" \
@@ -128,7 +128,7 @@ index ec90862..611a82e 100755
          "$root/etc/apparmor.d"
      if package_with_updater_enabled; then
          mkdir -p \
-@@ -865,6 +870,12 @@ stage_common_package_files() {
+@@ -899,6 +904,12 @@ stage_common_package_files() {
              "$root/usr/share/polkit-1/actions"
      fi
  
@@ -141,75 +141,24 @@ index ec90862..611a82e 100755
      rm -rf "$app_root"
      cp -aT "$APP_DIR" "$app_root"
      mkdir -p "$app_root/.codex-linux"
-diff --git a/updater/src/app.rs b/updater/src/app.rs
-index 0f51e07..86f53c7 100644
---- a/updater/src/app.rs
-+++ b/updater/src/app.rs
-@@ -30,7 +30,7 @@ pub async fn run(cli: Cli) -> Result<()> {
- 
-     match cli.command {
-         Commands::Daemon => daemon(&config, &mut state, &paths).await,
--        Commands::CheckNow => check(&config, &mut state, &paths).await,
-+        Commands::CheckNow => check(&config, &mut state, &paths, true).await,
-         Commands::Status { json } => status(&state, json),
-         Commands::Diagnose { json } => diagnose(&config, &state, &paths, json),
-         Commands::InstallReady => run_install_ready(&config, &mut state, &paths).await,
-@@ -58,7 +58,7 @@ fn run_privileged_command(command: &Commands) -> Option<Result<()>> {
- 
- async fn daemon(config: &RuntimeConfig, state: &mut PersistedState, paths: &RuntimePaths) -> Result<()> {
-     time::sleep(config.initial_check_delay_duration()).await;
--    if let Err(error) = check(config, state, paths).await {
-+    if let Err(error) = check(config, state, paths, false).await {
-         error!(?error, "initial update check failed");
-     }
-     let mut checks = time::interval(config.check_interval_duration());
-@@ -75,7 +75,7 @@ async fn daemon(config: &RuntimeConfig, state: &mut PersistedState, paths: &Runt
-         }
- 
-         tokio::select! {
--            _ = checks.tick() => if let Err(error) = check(config, state, paths).await { error!(?error, "periodic update check failed"); },
-+            _ = checks.tick() => if let Err(error) = check(config, state, paths, false).await { error!(?error, "periodic update check failed"); },
-             _ = reconcile.tick() => if let Err(error) = reconcile_pending_install(config, state, paths).await {
-                 error!(?error, "deferred install failed");
-             },
-@@ -158,12 +158,22 @@ fn reload_state(
-     Ok(())
- }
- 
--async fn check(config: &RuntimeConfig, state: &mut PersistedState, paths: &RuntimePaths) -> Result<()> {
-+async fn check(
-+    config: &RuntimeConfig,
-+    state: &mut PersistedState,
-+    paths: &RuntimePaths,
-+    explicit_retry: bool,
-+) -> Result<()> {
-     let _lock = match CheckLock::try_acquire(&paths.state_dir.join("check.lock"))? {
-         Some(lock) => lock,
-         None => { info!("another update check is active"); return Ok(()); }
-     };
-     reload_state(config, state, paths)?;
-+    // A failed check should be re-run when the user asks for one explicitly,
-+    // otherwise the daemon would stay stuck on the persisted failure.
-+    if explicit_retry && state.status == UpdateStatus::Failed {
-+        state.status = UpdateStatus::Idle;
-+    }
-     recover_interrupted_check(state);
-     let previous_state = state.clone();
-     let previous_status = state.status.clone();
 diff --git a/updater/src/config.rs b/updater/src/config.rs
-index 9db055a..d639d70 100644
+index 1253bf93240c4f858c45e77a765265cf323a39ca..65bf0da81631d1a5b3922814a7b171baaa49abb4 100644
 --- a/updater/src/config.rs
 +++ b/updater/src/config.rs
-@@ -3,7 +3,7 @@
+@@ -3,7 +3,11 @@
  use anyhow::{Context, Result};
  use directories::BaseDirs;
  use serde::{Deserialize, Serialize};
 -use std::{fs, path::PathBuf, time::Duration};
-+use std::{fs, path::{Path, PathBuf}, time::Duration};
++use std::{
++    fs,
++    path::{Path, PathBuf},
++    time::Duration,
++};
  
  const SERVICE_NAME: &str = "codex-update-manager";
  
-@@ -87,10 +87,20 @@ impl RuntimeConfig {
+@@ -87,10 +91,20 @@ impl RuntimeConfig {
              ..Self::default()
          };
          if !value.builder_bundle_root.exists() {
@@ -224,9 +173,9 @@ index 9db055a..d639d70 100644
 +                .ok()
 +                .and_then(|directory| find_repository_root(&directory))
 +                .or_else(|| {
-+                    std::env::current_exe().ok().and_then(|executable| {
-+                        find_repository_root(executable.parent()?)
-+                    })
++                    std::env::current_exe()
++                        .ok()
++                        .and_then(|executable| find_repository_root(executable.parent()?))
 +                });
 +            if let Some(repository_root) = repository_root {
 +                value.builder_bundle_root = repository_root;
@@ -234,7 +183,7 @@ index 9db055a..d639d70 100644
          }
          value
      }
-@@ -129,6 +139,13 @@ impl RuntimeConfig {
+@@ -133,6 +147,13 @@ impl RuntimeConfig {
      }
  }
  
@@ -248,8 +197,7 @@ index 9db055a..d639d70 100644
  pub fn effective_feature_config_path(config: &RuntimeConfig) -> Option<PathBuf> {
      config
          .feature_config_path
-@@ -149,4 +166,15 @@ mod tests {
-         assert_eq!(config.app_executable_path, PathBuf::from("/opt/codex-desktop/ChatGPT"));
+@@ -157,3 +178,17 @@ mod tests {
          Ok(())
      }
 +
@@ -260,7 +208,10 @@ index 9db055a..d639d70 100644
 +        fs::create_dir_all(&updater_dir)?;
 +        fs::write(root.path().join("install.sh"), "#!/bin/sh\n")?;
 +
-+        assert_eq!(find_repository_root(&updater_dir), Some(root.path().to_path_buf()));
++        assert_eq!(
++            find_repository_root(&updater_dir),
++            Some(root.path().to_path_buf())
++        );
 +        Ok(())
 +    }
  }
